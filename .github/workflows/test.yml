@@ -1,0 +1,68 @@
+name: SUSFS Test Workflow
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  susfs-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout kernel_common_modifications
+      uses: actions/checkout@v4
+      with:
+        repository: MrPankaj24/kernel_common_modifications
+        path: kernel_common_modifications
+
+    - name: Clone susfs4ksu at branch gki-android13-5.15
+      run: |
+        git clone --branch gki-android13-5.15 https://gitlab.com/simonpunk/susfs4ksu.git
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libssl-dev bc flex bison libncurses5-dev gcc-aarch64-linux-gnu
+
+    - name: Build Kernel (edit config/targets as needed)
+      working-directory: kernel_common_modifications
+      run: |
+        export ARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        make distclean
+        make defconfig
+        make -j$(nproc)
+      continue-on-error: true
+
+    - name: Build susfs module (edit as needed)
+      run: |
+        cd susfs4ksu
+        make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -C ../kernel_common_modifications M=$(pwd) modules
+      continue-on-error: true
+
+    - name: Run susfs tests (add your real test commands)
+      run: |
+        echo "Run your susfs tests here"
+      continue-on-error: true
+
+    - name: Collect kernel rejects, .orig, and manifest
+      run: |
+        mkdir -p artifacts/rejects
+        # Find and copy all .rej files, and their corresponding original files
+        find kernel_common_modifications -type f -name '*.rej' | while read rejfile; do
+          cp --parents "$rejfile" artifacts/rejects/
+          origfile="${rejfile%.rej}"
+          [ -f "$origfile" ] && cp --parents "$origfile" artifacts/rejects/
+        done
+        # Create manifest of all files that caused .rej
+        find kernel_common_modifications -type f -name '*.rej' > artifacts/rejects/reject-files-manifest.txt
+        # Collect main build artifacts (edit as needed)
+        cp -a kernel_common_modifications/arch/arm64/boot/Image* artifacts/ || true
+        cp -a susfs4ksu/*.ko artifacts/ || true
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: susfs-test-artifacts
+        path: artifacts
