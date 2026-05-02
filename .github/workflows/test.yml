@@ -1,4 +1,4 @@
-name: SUSFS Patch, Fixes, and Collect Rejects
+name: SUSFS + ZeroMount Patch, Fixes, and Collect Rejects
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches: [ main ]
 
 jobs:
-  susfs-apply-patch:
+  patch-and-collect-rejects:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,7 +20,7 @@ jobs:
       run: |
         git clone --branch gki-android13-5.15 https://gitlab.com/simonpunk/susfs4ksu.git
 
-    - name: Download fix patches
+    - name: Download susfs fix patches
       run: |
         cd kernel_common_modifications
         curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_base.patch
@@ -30,13 +30,20 @@ jobs:
         curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_task_mmu.patch
         cd ..
 
-    - name: Apply susfs patch (create rejects)
+    - name: Download ReSukiSU/ZeroMount patches
+      run: |
+        cd kernel_common_modifications
+        curl -L -O https://github.com/Enginex0/Super-Builders/raw/main/android13-5.15/ReSukiSU/patches/60_zeromount-android13-5.15.patch
+        curl -L -O https://github.com/Enginex0/Super-Builders/raw/main/android13-5.15/ReSukiSU/patches/_archive/65_zeromount-adb-filter-android13-5.15.patch
+        cd ..
+
+    - name: Apply SUSFS patch (create rejects)
       run: |
         cd kernel_common_modifications
         patch -p1 < ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || true
         cd ..
 
-    - name: Apply fix patches (handle both patch styles)
+    - name: Apply SUSFS fix patches (auto-detect -p1/-p0)
       run: |
         cd kernel_common_modifications
         for patch in fix_*.patch; do
@@ -50,7 +57,21 @@ jobs:
         done
         cd ..
 
-    - name: Collect .rej, .orig, and patched files
+    - name: Apply ReSukiSU/ZeroMount patches (auto-detect -p)
+      run: |
+        cd kernel_common_modifications
+        for patch in 60_zeromount-android13-5.15.patch 65_zeromount-adb-filter-android13-5.15.patch; do
+          if grep -q '^+++ b/' "$patch"; then
+            echo "Applying $patch with -p1"
+            patch -p1 < "$patch" || true
+          else
+            echo "Applying $patch with -p0"
+            patch -p0 < "$patch" || true
+          fi
+        done
+        cd ..
+
+    - name: Collect .rej, .orig, and patched files (ALL PATCHES)
       run: |
         mkdir -p artifacts/rejects
         find kernel_common_modifications -type f -name '*.rej' | while read rejfile; do
