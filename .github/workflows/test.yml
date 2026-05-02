@@ -37,6 +37,13 @@ jobs:
         curl -L -O https://github.com/Enginex0/Super-Builders/raw/main/android13-5.15/ReSukiSU/patches/_archive/65_zeromount-adb-filter-android13-5.15.patch
         cd ..
 
+    - name: Download ZeroMount fix patches
+      run: |
+        cd kernel_common_modifications
+        curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_zeromount_stat.patch
+        curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_zeromount_task_mmu.patch
+        cd ..
+
     - name: Apply SUSFS patch (create rejects)
       run: |
         cd kernel_common_modifications
@@ -46,7 +53,7 @@ jobs:
     - name: Apply SUSFS fix patches (auto-detect -p1/-p0)
       run: |
         cd kernel_common_modifications
-        for patch in fix_*.patch; do
+        for patch in fix_base.patch fix_exec.patch fix_namespace.patch fix_open.patch fix_task_mmu.patch; do
           if grep -q '^+++ b/' "$patch"; then
             echo "Applying $patch with -p1"
             patch -p1 < "$patch" || true
@@ -61,6 +68,20 @@ jobs:
       run: |
         cd kernel_common_modifications
         for patch in 60_zeromount-android13-5.15.patch 65_zeromount-adb-filter-android13-5.15.patch; do
+          if grep -q '^+++ b/' "$patch"; then
+            echo "Applying $patch with -p1"
+            patch -p1 < "$patch" || true
+          else
+            echo "Applying $patch with -p0"
+            patch -p0 < "$patch" || true
+          fi
+        done
+        cd ..
+
+    - name: Apply ZeroMount fix patches (auto-detect -p)
+      run: |
+        cd kernel_common_modifications
+        for patch in fix_zeromount_stat.patch fix_zeromount_task_mmu.patch; do
           if grep -q '^+++ b/' "$patch"; then
             echo "Applying $patch with -p1"
             patch -p1 < "$patch" || true
