@@ -1,4 +1,4 @@
-name: SUSFS Patch Dry-run
+name: SUSFS Patch and Collect Rejects
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches: [ main ]
 
 jobs:
-  susfs-patch-dryrun:
+  susfs-apply-patch:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,19 +20,27 @@ jobs:
       run: |
         git clone --branch gki-android13-5.15 https://gitlab.com/simonpunk/susfs4ksu.git
 
-    - name: Apply susfs patch (dry-run)
+    - name: Apply susfs patch (create rejects)
       run: |
         cd kernel_common_modifications
-        patch --dry-run -p1 < ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || true
+        patch -p1 < ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || true
 
-    - name: Collect .rej files and manifest (if any)
+    - name: Collect .rej, .orig, and patched files
       run: |
         mkdir -p artifacts/rejects
-        find kernel_common_modifications -type f -name '*.rej' -exec cp --parents {} artifacts/rejects/ \;
+        # For each .rej, copy .rej, original file, and patched file to artifacts
+        find kernel_common_modifications -type f -name '*.rej' | while read rejfile; do
+          cp --parents "$rejfile" artifacts/rejects/
+          basefile="${rejfile%.rej}"
+          [ -f "$basefile" ] && cp --parents "$basefile" artifacts/rejects/
+          origfile="${basefile}.orig"
+          [ -f "$origfile" ] && cp --parents "$origfile" artifacts/rejects/
+        done
+        # Manifest
         find kernel_common_modifications -type f -name '*.rej' > artifacts/rejects/reject-files-manifest.txt || true
 
-    - name: Upload patch dry run artifacts
+    - name: Upload patch artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: patch-dryrun-artifacts
+        name: patch-artifacts
         path: artifacts
