@@ -20,10 +20,9 @@ jobs:
       run: |
         git clone --branch gki-android13-5.15 https://gitlab.com/simonpunk/susfs4ksu.git
 
-    - name: Download and apply fix patches
+    - name: Download fix patches
       run: |
         cd kernel_common_modifications
-        # Download patches directly in the kernel root
         curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_base.patch
         curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_exec.patch
         curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_namespace.patch
@@ -37,12 +36,17 @@ jobs:
         patch -p1 < ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || true
         cd ..
 
-    - name: Apply fix patches (resolving .rej)
+    - name: Apply fix patches (handle both patch styles)
       run: |
         cd kernel_common_modifications
-        # Apply each fix patch with -p0, as their paths match kernel root
         for patch in fix_*.patch; do
-          patch -p0 < "$patch" || true
+          if grep -q '^+++ b/' "$patch"; then
+            echo "Applying $patch with -p1"
+            patch -p1 < "$patch" || true
+          else
+            echo "Applying $patch with -p0"
+            patch -p0 < "$patch" || true
+          fi
         done
         cd ..
 
