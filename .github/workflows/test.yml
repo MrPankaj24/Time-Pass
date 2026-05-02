@@ -40,7 +40,7 @@ jobs:
         cd kernel_common_modifications
         # Try applying each fix patch, ignore already-applied warnings
         for patch in ../fix_patches/*.patch; do
-          patch -p1 < "$patch" || true
+          patch -p0 < "$patch" || true
         done
         cd ..
 
