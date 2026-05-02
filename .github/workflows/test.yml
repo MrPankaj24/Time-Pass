@@ -1,4 +1,4 @@
-name: SUSFS Patch and Collect Rejects
+name: SUSFS Patch, Fixes, and Collect Rejects
 
 on:
   workflow_dispatch:
@@ -20,15 +20,34 @@ jobs:
       run: |
         git clone --branch gki-android13-5.15 https://gitlab.com/simonpunk/susfs4ksu.git
 
+    - name: Download fix patches
+      run: |
+        mkdir -p fix_patches
+        curl -L -o fix_patches/fix_base.patch https://github.com/MrPankaj24/kernel_patch/raw/main/fix_base.patch
+        curl -L -o fix_patches/fix_exec.patch https://github.com/MrPankaj24/kernel_patch/raw/main/fix_exec.patch
+        curl -L -o fix_patches/fix_namespace.patch https://github.com/MrPankaj24/kernel_patch/raw/main/fix_namespace.patch
+        curl -L -o fix_patches/fix_open.patch https://github.com/MrPankaj24/kernel_patch/raw/main/fix_open.patch
+        curl -L -o fix_patches/fix_task_mmu.patch https://github.com/MrPankaj24/kernel_patch/raw/main/fix_task_mmu.patch
+
     - name: Apply susfs patch (create rejects)
       run: |
         cd kernel_common_modifications
         patch -p1 < ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch || true
+        cd ..
+
+    - name: Apply fix patches (resolving .rej)
+      run: |
+        cd kernel_common_modifications
+        # Try applying each fix patch, ignore already-applied warnings
+        for patch in ../fix_patches/*.patch; do
+          patch -p1 < "$patch" || true
+        done
+        cd ..
 
     - name: Collect .rej, .orig, and patched files
       run: |
         mkdir -p artifacts/rejects
-        # For each .rej, copy .rej, original file, and patched file to artifacts
+        # For each .rej, copy .rej, original file, and patched file
         find kernel_common_modifications -type f -name '*.rej' | while read rejfile; do
           cp --parents "$rejfile" artifacts/rejects/
           basefile="${rejfile%.rej}"
