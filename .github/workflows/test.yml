@@ -20,14 +20,16 @@ jobs:
       run: |
         git clone --branch gki-android13-5.15 https://gitlab.com/simonpunk/susfs4ksu.git
 
-    - name: Download fix patches
+    - name: Download and apply fix patches
       run: |
-        mkdir -p fix_patches
-        curl -L -o fix_patches/fix_base.patch https://github.com/MrPankaj24/kernel_patch/raw/main/fix_base.patch
-        curl -L -o fix_patches/fix_exec.patch https://github.com/MrPankaj24/kernel_patch/raw/main/fix_exec.patch
-        curl -L -o fix_patches/fix_namespace.patch https://github.com/MrPankaj24/kernel_patch/raw/main/fix_namespace.patch
-        curl -L -o fix_patches/fix_open.patch https://github.com/MrPankaj24/kernel_patch/raw/main/fix_open.patch
-        curl -L -o fix_patches/fix_task_mmu.patch https://github.com/MrPankaj24/kernel_patch/raw/main/fix_task_mmu.patch
+        cd kernel_common_modifications
+        # Download patches directly in the kernel root
+        curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_base.patch
+        curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_exec.patch
+        curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_namespace.patch
+        curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_open.patch
+        curl -L -O https://github.com/MrPankaj24/kernel_patch/raw/main/fix_task_mmu.patch
+        cd ..
 
     - name: Apply susfs patch (create rejects)
       run: |
@@ -38,16 +40,15 @@ jobs:
     - name: Apply fix patches (resolving .rej)
       run: |
         cd kernel_common_modifications
-        # Try applying each fix patch, ignore already-applied warnings
-        for patch in ../fix_patches/*.patch; do
-          patch -p1 < "$patch" || true
+        # Apply each fix patch with -p0, as their paths match kernel root
+        for patch in fix_*.patch; do
+          patch -p0 < "$patch" || true
         done
         cd ..
 
     - name: Collect .rej, .orig, and patched files
       run: |
         mkdir -p artifacts/rejects
-        # For each .rej, copy .rej, original file, and patched file
         find kernel_common_modifications -type f -name '*.rej' | while read rejfile; do
           cp --parents "$rejfile" artifacts/rejects/
           basefile="${rejfile%.rej}"
@@ -55,7 +56,6 @@ jobs:
           origfile="${basefile}.orig"
           [ -f "$origfile" ] && cp --parents "$origfile" artifacts/rejects/
         done
-        # Manifest
         find kernel_common_modifications -type f -name '*.rej' > artifacts/rejects/reject-files-manifest.txt || true
 
     - name: Upload patch artifacts
